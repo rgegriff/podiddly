@@ -2,7 +2,7 @@ from django.contrib import admin
 from models import *
 
 class PodcastAdmin(admin.ModelAdmin):
-    pass
+    prepopulated_fields = {"slug" : ("title",)}
 
 class PodcastEpisodeAdmin(admin.ModelAdmin):
     pass
