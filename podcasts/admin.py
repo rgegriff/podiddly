@@ -4,7 +4,7 @@ from models import *
 class PodcastAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug" : ("title",)}
 
-class PodcastEpisodeAdmin(admin.ModelAdmin):
+class PodcastAuthorAdmin(admin.ModelAdmin):
     pass
 
 class PodcastCategoryAdmin(admin.ModelAdmin):
@@ -13,7 +13,11 @@ class PodcastCategoryAdmin(admin.ModelAdmin):
 class PodcastEnclosureAdmin(admin.ModelAdmin):
     pass
 
+class PodcastEpisodeAdmin(admin.ModelAdmin):
+    pass
+
 admin.site.register(Podcast, PodcastAdmin)
-admin.site.register(PodcastEpisode, PodcastEpisodeAdmin)
+admin.site.register(PodcastAuthor, PodcastAuthorAdmin)
 admin.site.register(PodcastCategory, PodcastCategoryAdmin)
 admin.site.register(PodcastEnclosure, PodcastEnclosureAdmin)
+admin.site.register(PodcastEpisode, PodcastEpisodeAdmin)

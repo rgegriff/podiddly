@@ -3,6 +3,12 @@ import datetime
 from feedgen.feed import FeedGenerator
 import uuid
 
+def get_method(m_parts, obj):
+  """ This function can extract a method from a nested object """
+  for m_part in m_parts:
+    obj = getattr(obj,m_part)
+  return obj # everything's an object ;-)
+
 class Podcast(models.Model):
   MAPPINGS = (
       (("title",),("title",)),
@@ -56,16 +62,26 @@ class Podcast(models.Model):
       # collect the values from self
       for value_name in value_names:
         values.append( getattr(self, value_name) )
-      
-      method = fg
       # decend the attribute tree
-      for m_part in methods:
-        method = getattr(method, m_part)
+      method = get_method(methods, fg)
       # apply the values to the found method
-      print m_part, values
       method(*values)
 
-    return fg.rss_str(pretty=True)
+      for episode in self.episodes.all():
+        # This is the same pattern as above, I wonder if I can DRY this out.
+        entry = fg.add_entry()
+        value_names, method_names = zip(*episode.MAPPINGS)
+        values = []
+        for ind, value_name in enumerate(value_names):
+          print value_name
+          values  = [getattr(episode, v) for v in value_name]
+          if None not in values:
+            print values
+            method = get_method(method_names[ind], entry)
+            method(*values)
+    print "DONE"
+        
+    return fg
           
 
   def __unicode__(self):
@@ -83,12 +99,22 @@ class PodcastCategory(models.Model):
     return out
   
 class PodcastEpisode(models.Model):
+  MAPPINGS = (
+              (("title",),('title',)),
+              (("author_list",),("author",)),
+              (("subtitle",),("podcast","itunes_subtitle",)),
+              (("image_href",),("podcast","itunes_image",)),
+              (("url","length","type"),("enclosure",)),
+              (("guid",),("guid",)),
+              (("pubdate",),("pubdate",)),
+              (("itunes_explicit",),("podcast","itunes_explicit"))
+            )
   class Meta:
     ordering = ["-pubdate"]
 
   podcast = models.ForeignKey("Podcast", related_name="episodes")
   title = models.CharField(max_length=255)
-  author = models.CharField(max_length=255)
+  authors = models.ManyToManyField("PodcastAuthor", null=True, blank=True)
   subtitle = models.CharField(max_length=255)
   summary = models.TextField()
   image_href = models.URLField(max_length=2000)
@@ -96,7 +122,51 @@ class PodcastEpisode(models.Model):
   guid = models.CharField(max_length=255, default=lambda: "pe:%s"%uuid.uuid4())
   pubdate = models.DateTimeField(auto_now_add=True, default=lambda:datetime.datetime.now())
   explicit = models.BooleanField()
+
+  @property
+  def author_list(self):
+    authors = []
+    for author in self.authors.all():
+        if author is not []:
+            authors.append(author)
+    if authors == []:
+        authors = None
+    return authors
+
+  @property
+  def itunes_explicit(self):
+    # @todo: make this support clean setting as well
+    return "yes" if self.explicit else "no"
   
+  @property
+  def url(self):
+    return self.enclosure.url
+             
+  @property
+  def length(self):
+    return str(self.enclosure.length)
+
+  @property
+  def type(self):
+    return self.enclosure.type
+
+class PodcastAuthor(models.Model):
+    name = models.CharField(max_length=255, null=True, blank=True) #determine if this is req by spec
+    email = models.EmailField(max_length=255, null=True, blank=True)
+    uri = models.URLField(max_length=2000, null=True, blank=True)
+
+    def as_dict(self):
+        """ returns the values of the author as dict """
+        d = {}
+        for f in ('name','email','url'):
+            value = getattr(self, f)
+            if value not in (None,""):
+                d[f] = value
+        return d
+
+    def __unicode__(self):
+        return "%s(%s)"%(self.name, self.email)
+
 class PodcastEnclosure(models.Model):
   TYPES_AVAILABLE=(('.mp3',	'audio/mpeg'),
                    ('.m4a',	'audio/x-m4a'),
